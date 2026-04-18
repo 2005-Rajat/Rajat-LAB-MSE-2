@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>LL(1) Parser Generator — Compiler Design Tool</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+  /* ======== RESET & VARS ======== */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0a0c0f;
+    --bg2: #111418;
+    --bg3: #181c22;
+    --bg4: #1e242c;
+    --border: rgba(255,255,255,0.07);
+    --border-bright: rgba(255,255,255,0.14);
+    --accent: #00e5a0;
+    --accent2: #00b37d;
+    --accent-dim: rgba(0,229,160,0.12);
+    --accent-glow: rgba(0,229,160,0.25);
+    --red: #ff4d6d;
+    --red-dim: rgba(255,77,109,0.12);
+    --amber: #fbbf24;
+    --amber-dim: rgba(251,191,36,0.12);
+    --blue: #60a5fa;
+    --blue-dim: rgba(96,165,250,0.12);
+    --text: #e8eaf0;
+    --text2: #8892a4;
+    --text3: #545d6e;
+    --font-display: 'Syne', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --radius: 8px;
+    --radius-lg: 14px;
+  }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 14px;
+    line-height: 1.7;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ======== SCROLLBAR ======== */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 99px; }
+
+  /* ======== NAVBAR ======== */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 clamp(16px, 4vw, 48px);
+    height: 60px;
+    background: rgba(10,12,15,0.85);
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-logo {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: -0.02em;
+    text-decoration: none;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .nav-logo span { color: var(--text2); font-weight: 400; font-size: 13px; margin-left: 4px; }
+  .nav-links { display: flex; align-items: center; gap: 6px; }
+  .nav-links a {
+    color: var(--text2); text-decoration: none; font-size: 12px;
+    padding: 5px 12px; border-radius: var(--radius);
+    letter-spacing: 0.03em; transition: all 0.18s;
+  }
+  .nav-links a:hover { color: var(--text); background: var(--bg3); }
+  .nav-links a.cta {
+    color: var(--bg); background: var(--accent); font-weight: 500;
+  }
+  .nav-links a.cta:hover { background: #00ffb3; }
+  .hamburger { display: none; flex-direction: column; gap: 4px; cursor: pointer; padding: 4px; }
+  .hamburger span { display: block; width: 22px; height: 2px; background: var(--text2); border-radius: 2px; transition: all 0.2s; }
+  .mobile-menu {
+    display: none; position: fixed; top: 60px; left: 0; right: 0;
+    background: var(--bg2); border-bottom: 1px solid var(--border);
+    flex-direction: column; padding: 12px 24px 20px; gap: 4px; z-index: 99;
+  }
+  .mobile-menu.open { display: flex; }
+  .mobile-menu a { color: var(--text2); text-decoration: none; font-size: 13px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+  .mobile-menu a:last-child { border: none; color: var(--accent); }
+
+  /* ======== HERO ======== */
+  .hero {
+    padding-top: 120px;
+    padding-bottom: 80px;
+    padding-left: clamp(16px, 4vw, 80px);
+    padding-right: clamp(16px, 4vw, 80px);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 60px;
+    align-items: center;
+    max-width: 1200px;
+    margin: 0 auto;
+    position: relative;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: 80px; right: -100px;
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(0,229,160,0.06) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--accent-dim); border: 1px solid rgba(0,229,160,0.2);
+    color: var(--accent); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 4px 12px; border-radius: 99px; margin-bottom: 20px;
+  }
+  .hero-badge::before { content: '●'; font-size: 8px; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .hero-title {
+    font-family: var(--font-display);
+    font-size: clamp(36px, 5vw, 60px);
+    font-weight: 800;
+    line-height: 1.08;
+    letter-spacing: -0.03em;
+    margin-bottom: 20px;
+  }
+  .hero-title .accent { color: var(--accent); }
+  .hero-title .dim { color: var(--text3); }
+  .hero-desc {
+    color: var(--text2); font-size: 14px; line-height: 1.8;
+    margin-bottom: 32px; max-width: 440px;
+  }
+  .hero-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 22px; border-radius: var(--radius);
+    font-family: var(--font-mono); font-size: 13px;
+    text-decoration: none; cursor: pointer; border: none;
+    transition: all 0.18s; letter-spacing: 0.02em;
+  }
+  .btn-primary { background: var(--accent); color: var(--bg); font-weight: 700; }
+  .btn-primary:hover { background: #00ffb3; transform: translateY(-1px); box-shadow: 0 8px 24px var(--accent-glow); }
+  .btn-ghost { background: transparent; color: var(--text2); border: 1px solid var(--border-bright); }
+  .btn-ghost:hover { color: var(--text); border-color: var(--text3); background: var(--bg3); }
+  .hero-visual {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    font-size: 12px;
+    position: relative;
+  }
+  .hero-visual::after {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(135deg, rgba(0,229,160,0.04) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .code-header {
+    display: flex; align-items: center; gap: 6px;
+    padding: 10px 14px; background: var(--bg3);
+    border-bottom: 1px solid var(--border);
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot-r { background: #ff5f57; }
+  .dot-y { background: #febc2e; }
+  .dot-g { background: #28c840; }
+  .code-filename { color: var(--text3); font-size: 11px; margin-left: 6px; }
+  .code-body { padding: 16px; overflow: auto; line-height: 2; }
+  .code-body .kw { color: var(--accent); }
+  .code-body .nt { color: #60a5fa; }
+  .code-body .t { color: #fbbf24; }
+  .code-body .arr { color: var(--text3); }
+  .code-body .cmt { color: var(--text3); font-style: italic; }
+  .code-body .ok { color: var(--accent); }
+  .code-body .err { color: var(--red); }
+
+  /* ======== SECTION COMMON ======== */
+  section { padding: clamp(48px, 7vw, 100px) clamp(16px, 4vw, 80px); }
+  .section-inner { max-width: 1200px; margin: 0 auto; }
+  .section-label {
+    font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 10px;
+  }
+  .section-title {
+    font-family: var(--font-display);
+    font-size: clamp(26px, 3.5vw, 42px);
+    font-weight: 700; letter-spacing: -0.02em;
+    color: var(--text); line-height: 1.15; margin-bottom: 14px;
+  }
+  .section-sub { color: var(--text2); font-size: 14px; max-width: 520px; line-height: 1.8; }
+
+  /* ======== HOW IT WORKS ======== */
+  #how { background: var(--bg2); }
+  .steps-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px; margin-top: 48px;
+  }
+  .step-card {
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 24px;
+    position: relative; overflow: hidden; transition: border-color 0.2s;
+  }
+  .step-card:hover { border-color: var(--border-bright); }
+  .step-num {
+    font-family: var(--font-display); font-size: 48px; font-weight: 800;
+    color: rgba(255,255,255,0.04); position: absolute; top: 8px; right: 16px;
+    line-height: 1;
+  }
+  .step-icon {
+    width: 36px; height: 36px; border-radius: var(--radius);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; margin-bottom: 14px; background: var(--accent-dim);
+  }
+  .step-card h3 { font-family: var(--font-display); font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+  .step-card p { color: var(--text2); font-size: 12px; line-height: 1.7; }
+
+  /* ======== APP SECTION ======== */
+  #app { background: var(--bg); }
+  .app-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    margin-top: 40px;
+    background: var(--bg2);
+  }
+  .app-panel { display: flex; flex-direction: column; }
+  .app-panel + .app-panel { border-left: 1px solid var(--border); }
+  .app-panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 16px; background: var(--bg3);
+    border-bottom: 1px solid var(--border);
+    font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase;
+    color: var(--text3);
+  }
+  .app-panel-header .pills { display: flex; gap: 4px; }
+  .pill {
+    padding: 2px 8px; border-radius: 99px; font-size: 10px; cursor: pointer;
+    border: 1px solid var(--border); color: var(--text3); transition: all 0.15s;
+  }
+  .pill.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+  textarea.app-textarea {
+    flex: 1; width: 100%; min-height: 220px;
+    background: transparent; color: var(--text);
+    border: none; outline: none; resize: none;
+    font-family: var(--font-mono); font-size: 12px;
+    padding: 14px 16px; line-height: 1.8;
+  }
+  textarea.app-textarea::placeholder { color: var(--text3); }
+  .app-actions {
+    display: flex; gap: 8px; padding: 10px 12px;
+    border-top: 1px solid var(--border); flex-wrap: wrap;
+  }
+  .app-btn {
+    padding: 6px 14px; border-radius: var(--radius);
+    font-family: var(--font-mono); font-size: 11px;
+    cursor: pointer; border: 1px solid var(--border);
+    background: transparent; color: var(--text2); transition: all 0.15s;
+    letter-spacing: 0.02em;
+  }
+  .app-btn:hover { background: var(--bg4); color: var(--text); }
+  .app-btn.run { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 700; }
+  .app-btn.run:hover { background: #00ffb3; }
+  .output-area {
+    flex: 1; overflow: auto; padding: 14px 16px;
+    font-size: 11.5px; line-height: 1.9; min-height: 160px;
+  }
+  .tag-nt { display: inline-block; background: var(--blue-dim); color: var(--blue); border-radius: 4px; padding: 0 6px; font-size: 10px; }
+  .tag-t { display: inline-block; background: var(--amber-dim); color: var(--amber); border-radius: 4px; padding: 0 6px; font-size: 10px; }
+  .tag-eps { display: inline-block; background: var(--bg4); color: var(--text3); border-radius: 4px; padding: 0 6px; font-size: 10px; }
+  .ff-row { display: grid; grid-template-columns: 130px 1fr 1fr; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--border); align-items: start; }
+  .ff-row:last-child { border: none; }
+  .ff-head { color: var(--text3); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; }
+  .notice-box {
+    margin: 8px 0; padding: 8px 12px; border-radius: var(--radius);
+    font-size: 12px; display: flex; align-items: center; gap: 8px;
+  }
+  .notice-ok { background: rgba(0,229,160,0.08); border: 1px solid rgba(0,229,160,0.18); color: var(--accent); }
+  .notice-err { background: var(--red-dim); border: 1px solid rgba(255,77,109,0.2); color: var(--red); }
+  .notice-info { background: var(--bg4); border: 1px solid var(--border); color: var(--text3); }
+
+  /* parse table */
+  .table-wrap { overflow: auto; }
+  table.ptable { border-collapse: collapse; font-size: 10.5px; min-width: 100%; }
+  table.ptable th, table.ptable td { border: 1px solid var(--border); padding: 5px 9px; white-space: nowrap; }
+  table.ptable th { background: var(--bg3); color: var(--text3); font-weight: 500; text-transform: uppercase; font-size: 10px; letter-spacing: 0.05em; }
+  table.ptable td.entry { color: var(--accent); }
+  table.ptable td.conflict { background: var(--red-dim); color: var(--red); }
+  table.ptable td:first-child { color: var(--blue); font-weight: 500; }
+
+  /* trace */
+  .trace-head { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; padding: 4px 0; color: var(--text3); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+  .trace-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 11px; }
+  .trace-row:last-child { border: none; }
+  .trace-row.ok-row { color: var(--accent); }
+  .trace-row.err-row { color: var(--red); }
+  .trace-col { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* input bar */
+  .input-bar-wrap {
+    display: flex; border-top: 1px solid var(--border);
+  }
+  .input-bar-wrap input {
+    flex: 1; background: transparent; color: var(--text);
+    border: none; outline: none; font-family: var(--font-mono); font-size: 12px;
+    padding: 10px 14px;
+  }
+  .input-bar-wrap input::placeholder { color: var(--text3); }
+  .input-bar-wrap button {
+    background: var(--accent); color: var(--bg); font-family: var(--font-mono);
+    font-size: 12px; font-weight: 700; border: none; cursor: pointer;
+    padding: 10px 16px; letter-spacing: 0.02em; transition: background 0.15s;
+  }
+  .input-bar-wrap button:hover { background: #00ffb3; }
+
+  /* ======== FEATURES ======== */
+  #features { background: var(--bg2); }
+  .features-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px; margin-top: 48px;
+  }
+  .feat-card {
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 22px;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .feat-card:hover { border-color: rgba(0,229,160,0.2); transform: translateY(-2px); }
+  .feat-icon {
+    font-size: 22px; margin-bottom: 14px; display: block;
+  }
+  .feat-card h3 { font-family: var(--font-display); font-size: 15px; font-weight: 600; margin-bottom: 7px; }
+  .feat-card p { color: var(--text2); font-size: 12px; line-height: 1.7; }
+
+  /* ======== THEORY ======== */
+  #theory { background: var(--bg); }
+  .theory-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 40px; align-items: start; margin-top: 40px;
+  }
+  .theory-block h3 {
+    font-family: var(--font-display); font-size: 16px;
+    font-weight: 600; margin-bottom: 10px; color: var(--accent);
+  }
+  .theory-block p { color: var(--text2); font-size: 13px; line-height: 1.8; margin-bottom: 10px; }
+  .formula-box {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px 16px;
+    font-size: 12px; line-height: 2; margin: 12px 0;
+    border-left: 3px solid var(--accent);
+  }
+  .formula-box .kw { color: var(--accent); font-weight: 700; }
+  .formula-box .var { color: var(--blue); }
+
+  /* ======== FOOTER ======== */
+  footer {
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    padding: clamp(32px, 5vw, 64px) clamp(16px, 4vw, 80px);
+  }
+  .footer-inner {
+    max-width: 1200px; margin: 0 auto;
+    display: grid; grid-template-columns: 1fr auto;
+    gap: 32px; align-items: center;
+  }
+  .footer-logo { font-family: var(--font-display); font-size: 18px; font-weight: 700; color: var(--accent); margin-bottom: 6px; }
+  .footer-sub { color: var(--text3); font-size: 12px; }
+  .footer-links { display: flex; gap: 20px; }
+  .footer-links a { color: var(--text3); text-decoration: none; font-size: 12px; transition: color 0.15s; }
+  .footer-links a:hover { color: var(--text); }
+  .footer-copy { grid-column: 1 / -1; color: var(--text3); font-size: 11px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+
+  /* ======== TABS (bottom section) ======== */
+  .tabs-row { display: flex; gap: 0; border-bottom: 1px solid var(--border); }
+  .tab-btn {
+    padding: 8px 16px; font-size: 11px; font-family: var(--font-mono);
+    background: transparent; border: none; color: var(--text3);
+    cursor: pointer; border-bottom: 2px solid transparent; letter-spacing: 0.04em;
+    text-transform: uppercase; transition: all 0.15s;
+  }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ======== ANIMATIONS ======== */
+  .fade-in { opacity: 0; transform: translateY(24px); animation: fadeUp 0.6s forwards; }
+  @keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
+  .fade-in:nth-child(1) { animation-delay: 0.05s; }
+  .fade-in:nth-child(2) { animation-delay: 0.12s; }
+  .fade-in:nth-child(3) { animation-delay: 0.19s; }
+  .fade-in:nth-child(4) { animation-delay: 0.26s; }
+
+  /* ======== RESPONSIVE ======== */
+  @media (max-width: 900px) {
+    .hero { grid-template-columns: 1fr; gap: 40px; }
+    .hero-visual { order: -1; }
+    .app-grid { grid-template-columns: 1fr; }
+    .app-panel + .app-panel { border-left: none; border-top: 1px solid var(--border); }
+    .theory-grid { grid-template-columns: 1fr; gap: 28px; }
+    .footer-inner { grid-template-columns: 1fr; }
+    .footer-links { flex-wrap: wrap; }
+  }
+  @media (max-width: 660px) {
+    .nav-links { display: none; }
+    .hamburger { display: flex; }
+    .hero-title { font-size: 32px; }
+    .ff-row { grid-template-columns: 90px 1fr 1fr; }
+    .trace-head, .trace-row { font-size: 10px; }
+  }
+  @media (max-width: 420px) {
+    .app-actions { gap: 6px; }
+    .app-btn { font-size: 10px; padding: 5px 10px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav>
+  <a href="#" class="nav-logo">LL(1) <span>/ parser-gen</span></a>
+  <div class="nav-links">
+    <a href="#how">How it works</a>
+    <a href="#app">Generator</a>
+    <a href="#features">Features</a>
+    <a href="#theory">Theory</a>
+    <a href="#app" class="cta">Launch Tool →</a>
+  </div>
+  <div class="hamburger" onclick="toggleMenu()">
+    <span></span><span></span><span></span>
+  </div>
+</nav>
+<div class="mobile-menu" id="mobileMenu">
+  <a href="#how" onclick="toggleMenu()">How it works</a>
+  <a href="#app" onclick="toggleMenu()">Generator</a>
+  <a href="#features" onclick="toggleMenu()">Features</a>
+  <a href="#theory" onclick="toggleMenu()">Theory</a>
+  <a href="#app" onclick="toggleMenu()">Launch Tool →</a>
+</div>
+
+<!-- HERO -->
+<section style="padding-top: 60px; padding-bottom: 0;">
+  <div class="hero">
+    <div class="hero-left">
+      <div class="hero-badge">Live Parser Generator</div>
+      <h1 class="hero-title">
+        LL(1)<br>
+        <span class="accent">Parse</span><br>
+        <span class="dim">Generator</span>
+      </h1>
+      <p class="hero-desc">Build predictive top-down parsers in your browser. Input any context-free grammar and instantly compute FIRST sets, FOLLOW sets, and LL(1) parse tables — with full trace visualization.</p>
+      <div class="hero-buttons">
+        <a href="#app" class="btn btn-primary">Try the Generator →</a>
+        <a href="#theory" class="btn btn-ghost">Learn the theory</a>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="code-header">
+        <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+        <span class="code-filename">grammar.ll1</span>
+      </div>
+      <div class="code-body">
+        <div><span class="kw">GRAMMAR</span> <span class="nt">Expression</span></div>
+        <div style="height:6px"></div>
+        <div><span class="nt">E</span>  <span class="arr">→</span>  <span class="nt">T</span> <span class="nt">E'</span></div>
+        <div><span class="nt">E'</span> <span class="arr">→</span>  <span class="t">+</span> <span class="nt">T</span> <span class="nt">E'</span>  <span class="arr">|</span>  <span class="t">ε</span></div>
+        <div><span class="nt">T</span>  <span class="arr">→</span>  <span class="nt">F</span> <span class="nt">T'</span></div>
+        <div><span class="nt">T'</span> <span class="arr">→</span>  <span class="t">*</span> <span class="nt">F</span> <span class="nt">T'</span>  <span class="arr">|</span>  <span class="t">ε</span></div>
+        <div><span class="nt">F</span>  <span class="arr">→</span>  <span class="t">(</span> <span class="nt">E</span> <span class="t">)</span>  <span class="arr">|</span>  <span class="t">id</span></div>
+        <div style="height:10px"></div>
+        <div><span class="cmt">// FIRST(E) = { id ( }</span></div>
+        <div><span class="cmt">// FOLLOW(E) = { ) $ }</span></div>
+        <div style="height:10px"></div>
+        <div><span class="ok">✓ Grammar is LL(1)</span></div>
+        <div><span class="ok">✓ Parse table: 5×6, 0 conflicts</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how">
+  <div class="section-inner">
+    <div class="section-label">Process</div>
+    <h2 class="section-title">How it works</h2>
+    <p class="section-sub">Four algorithmic steps transform your grammar into a working predictive parser.</p>
+    <div class="steps-grid">
+      <div class="step-card fade-in">
+        <div class="step-num">01</div>
+        <div class="step-icon">📝</div>
+        <h3>Input Grammar</h3>
+        <p>Write your context-free grammar rules in the form <code style="color:var(--accent)">A → α | β</code>. Use ε for empty productions.</p>
+      </div>
+      <div class="step-card fade-in">
+        <div class="step-num">02</div>
+        <div class="step-icon">⚡</div>
+        <h3>Compute FIRST Sets</h3>
+        <p>Fixed-point algorithm computes FIRST(α) for every non-terminal — the set of terminals that begin strings derived from α.</p>
+      </div>
+      <div class="step-card fade-in">
+        <div class="step-num">03</div>
+        <div class="step-icon">🔁</div>
+        <h3>Compute FOLLOW Sets</h3>
+        <p>Derives FOLLOW(A) — terminals that can appear immediately after A in any sentential form, including end-of-input $.</p>
+      </div>
+      <div class="step-card fade-in">
+        <div class="step-num">04</div>
+        <div class="step-icon">📊</div>
+        <h3>Build Parse Table</h3>
+        <p>Fills M[A,a] with production rules. Conflicts reveal whether the grammar is LL(1). Trace parsing step by step.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- GENERATOR APP -->
+<section id="app">
+  <div class="section-inner">
+    <div class="section-label">Interactive Tool</div>
+    <h2 class="section-title">Parser Generator</h2>
+    <p class="section-sub">Enter your grammar below and click Build to generate the full parse table and trace.</p>
+
+    <div class="app-grid" style="margin-top:32px;">
+      <!-- LEFT: Grammar Input -->
+      <div class="app-panel">
+        <div class="app-panel-header">
+          <span>Grammar Input</span>
+          <div class="pills">
+            <span class="pill active" onclick="loadEx('expr',this)">Expr</span>
+            <span class="pill" onclick="loadEx('simple',this)">Simple</span>
+            <span class="pill" onclick="loadEx('custom',this)">Blank</span>
+          </div>
+        </div>
+        <textarea class="app-textarea" id="grammarTA" placeholder="E -> T E'&#10;E' -> + T E' | ε&#10;T -> F T'&#10;T' -> * F T' | ε&#10;F -> ( E ) | id"></textarea>
+        <div class="app-actions">
+          <button class="app-btn run" onclick="buildParser()">▶  Build Parser</button>
+          <button class="app-btn" onclick="clearAll()">✕ Clear</button>
+        </div>
+      </div>
+
+      <!-- RIGHT: Results -->
+      <div class="app-panel">
+        <div class="tabs-row">
+          <button class="tab-btn active" onclick="switchTab(this,'tabFF')">FIRST / FOLLOW</button>
+          <button class="tab-btn" onclick="switchTab(this,'tabTable')">Parse Table</button>
+          <button class="tab-btn" onclick="switchTab(this,'tabTrace')">Trace</button>
+        </div>
+
+        <!-- FIRST/FOLLOW -->
+        <div id="tabFF" class="output-area">
+          <div class="notice-box notice-info">ℹ Build a grammar to see FIRST and FOLLOW sets.</div>
+        </div>
+
+        <!-- PARSE TABLE -->
+        <div id="tabTable" class="output-area table-wrap" style="display:none">
+          <div class="notice-box notice-info">ℹ Build a grammar to see the parse table.</div>
+        </div>
+
+        <!-- TRACE -->
+        <div id="tabTrace" style="display:none; flex-direction:column; flex:1;">
+          <div class="output-area" id="traceOutput" style="flex:1;">
+            <div class="notice-box notice-info">ℹ Build a grammar, then enter an input string.</div>
+          </div>
+          <div class="input-bar-wrap">
+            <input type="text" id="inputStr" placeholder="e.g.  id + id * id"/>
+            <button onclick="parseInput()">Parse ▶</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="section-inner">
+    <div class="section-label">Capabilities</div>
+    <h2 class="section-title">Everything you need</h2>
+    <p class="section-sub">A complete LL(1) parser construction pipeline, right in your browser.</p>
+    <div class="features-grid">
+      <div class="feat-card">
+        <span class="feat-icon">🔬</span>
+        <h3>FIRST & FOLLOW Analysis</h3>
+        <p>Iterative fixed-point computation of FIRST and FOLLOW sets for all non-terminals, including ε-production handling.</p>
+      </div>
+      <div class="feat-card">
+        <span class="feat-icon">📋</span>
+        <h3>LL(1) Parse Table</h3>
+        <p>Automatically fills M[A,a] entries. Highlights conflicts so you instantly know if a grammar is LL(1) or not.</p>
+      </div>
+      <div class="feat-card">
+        <span class="feat-icon">🔍</span>
+        <h3>Step-by-Step Trace</h3>
+        <p>Visualize the predictive parser stack, remaining input, and production applied at every single step.</p>
+      </div>
+      <div class="feat-card">
+        <span class="feat-icon">⚠️</span>
+        <h3>Conflict Detection</h3>
+        <p>Detects and flags FIRST/FIRST and FIRST/FOLLOW conflicts, helping you diagnose ambiguity and left recursion.</p>
+      </div>
+      <div class="feat-card">
+        <span class="feat-icon">🎓</span>
+        <h3>Preset Examples</h3>
+        <p>Load classic expression grammar or custom simple grammars to explore and learn the algorithm interactively.</p>
+      </div>
+      <div class="feat-card">
+        <span class="feat-icon">📱</span>
+        <h3>Fully Responsive</h3>
+        <p>Works on desktop, tablet and mobile. Designed for students and developers doing compiler design coursework.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- THEORY -->
+<section id="theory">
+  <div class="section-inner">
+    <div class="section-label">Theory</div>
+    <h2 class="section-title">The Algorithm</h2>
+    <p class="section-sub">LL(1) parsing is the backbone of predictive, top-down parsing with one token of lookahead.</p>
+    <div class="theory-grid">
+      <div>
+        <div class="theory-block">
+          <h3>FIRST Sets</h3>
+          <p>FIRST(α) is the set of terminals that can begin a string derived from α. If α ⟹* ε then ε ∈ FIRST(α).</p>
+          <div class="formula-box">
+            <div><span class="kw">FIRST</span>(<span class="var">ε</span>) = { ε }</div>
+            <div><span class="kw">FIRST</span>(<span class="var">a</span>β) = { <span class="var">a</span> }  // terminal</div>
+            <div><span class="kw">FIRST</span>(<span class="var">A</span>β) = <span class="kw">FIRST</span>(<span class="var">A</span>) – {ε}</div>
+            <div>  if ε ∈ <span class="kw">FIRST</span>(<span class="var">A</span>), add <span class="kw">FIRST</span>(β)</div>
+          </div>
+        </div>
+        <div class="theory-block" style="margin-top:28px;">
+          <h3>FOLLOW Sets</h3>
+          <p>FOLLOW(A) is the set of terminals that can appear immediately to the right of A in any sentential form.</p>
+          <div class="formula-box">
+            <div>$ ∈ <span class="kw">FOLLOW</span>(<span class="var">S</span>)  // start symbol</div>
+            <div>A → αBβ : <span class="kw">FIRST</span>(β)–{ε} ⊆ <span class="kw">FOLLOW</span>(<span class="var">B</span>)</div>
+            <div>A → αB or ε ∈ <span class="kw">FIRST</span>(β) :</div>
+            <div>  <span class="kw">FOLLOW</span>(<span class="var">A</span>) ⊆ <span class="kw">FOLLOW</span>(<span class="var">B</span>)</div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="theory-block">
+          <h3>Building the Parse Table</h3>
+          <p>For each production A → α, for each terminal a ∈ FIRST(α), add A → α to M[A, a]. If ε ∈ FIRST(α), add A → α to M[A, b] for each b ∈ FOLLOW(A).</p>
+          <div class="formula-box">
+            <div>For A → α :</div>
+            <div>  ∀ <span class="var">a</span> ∈ <span class="kw">FIRST</span>(α) – {ε} :</div>
+            <div>    M[<span class="var">A</span>, <span class="var">a</span>] = A → α</div>
+            <div>  if ε ∈ <span class="kw">FIRST</span>(α) :</div>
+            <div>    ∀ <span class="var">b</span> ∈ <span class="kw">FOLLOW</span>(<span class="var">A</span>) :</div>
+            <div>      M[<span class="var">A</span>, <span class="var">b</span>] = A → α</div>
+          </div>
+        </div>
+        <div class="theory-block" style="margin-top:28px;">
+          <h3>LL(1) Condition</h3>
+          <p>A grammar is LL(1) if and only if for every non-terminal A, every pair of distinct productions A → α and A → β satisfy:</p>
+          <div class="formula-box">
+            <div>1. <span class="kw">FIRST</span>(α) ∩ <span class="kw">FIRST</span>(β) = ∅</div>
+            <div>2. At most one of α, β derives ε</div>
+            <div>3. If β ⟹* ε :</div>
+            <div>   <span class="kw">FIRST</span>(α) ∩ <span class="kw">FOLLOW</span>(<span class="var">A</span>) = ∅</div>
+          </div>
+          <p style="margin-top:10px;">No left-recursive or ambiguous grammar is LL(1).</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-inner">
+    <div>
+      <div class="footer-logo">LL(1) / parser-gen</div>
+      <div class="footer-sub">An interactive compiler design learning tool.</div>
+    </div>
+    <div class="footer-links">
+      <a href="#how">How it works</a>
+      <a href="#app">Generator</a>
+      <a href="#features">Features</a>
+      <a href="#theory">Theory</a>
+    </div>
+    <div class="footer-copy">Built with HTML · CSS · JavaScript — no dependencies, no frameworks.</div>
+  </div>
+</footer>
+
+<!-- ======== PARSER ENGINE ======== -->
+<script>
+var G = null;
+
+function toggleMenu() {
+  document.getElementById('mobileMenu').classList.toggle('open');
+}
+
+var examples = {
+  expr: "E -> T E'\nE' -> + T E'\nE' -> ε\nT -> F T'\nT' -> * F T'\nT' -> ε\nF -> ( E )\nF -> id",
+  simple: "S -> A B\nS -> c\nA -> a\nA -> ε\nB -> b\nB -> d",
+  custom: ""
+};
+
+function loadEx(name, el) {
+  document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('grammarTA').value = examples[name] || '';
+}
+
+function clearAll() {
+  document.getElementById('grammarTA').value = '';
+  document.getElementById('tabFF').innerHTML = '<div class="notice-box notice-info">ℹ Build a grammar to see FIRST and FOLLOW sets.</div>';
+  document.getElementById('tabTable').innerHTML = '<div class="notice-box notice-info">ℹ Build a grammar to see the parse table.</div>';
+  document.getElementById('traceOutput').innerHTML = '<div class="notice-box notice-info">ℹ Build a grammar, then enter an input string.</div>';
+  G = null;
+}
+
+function switchTab(el, id) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  var ids = ['tabFF','tabTable','tabTrace'];
+  ids.forEach(t => {
+    var el2 = document.getElementById(t);
+    el2.style.display = t === id ? (t === 'tabTrace' ? 'flex' : 'block') : 'none';
+  });
+}
+
+function parseGrammarText(text) {
+  var lines = text.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('//'));
+  var rules = [];
+  var startSymbol = null;
+  for (var line of lines) {
+    var m = line.match(/^([A-Za-z_'][A-Za-z_'0-9]*)\s*->\s*(.+)$/);
+    if (!m) continue;
+    var lhs = m[1];
+    if (!startSymbol) startSymbol = lhs;
+    var alts = m[2].split('|').map(a => a.trim().split(/\s+/));
+    for (var rhs of alts) {
+      rules.push({ lhs, rhs: rhs.map(s => (s === 'ε' || s === 'eps') ? 'ε' : s) });
+    }
+  }
+  var nonterminals = new Set(rules.map(r => r.lhs));
+  var terminals = new Set();
+  for (var r of rules) for (var s of r.rhs) if (s !== 'ε' && !nonterminals.has(s)) terminals.add(s);
+  return { rules, startSymbol, nonterminals, terminals };
+}
+
+function computeFirst(grammar) {
+  var { rules, nonterminals } = grammar;
+  var first = {};
+  for (var nt of nonterminals) first[nt] = new Set();
+  var changed = true;
+  while (changed) {
+    changed = false;
+    for (var r of rules) {
+      var prev = first[r.lhs].size;
+      var allEps = true;
+      for (var sym of r.rhs) {
+        if (sym === 'ε') { first[r.lhs].add('ε'); allEps = false; break; }
+        if (!nonterminals.has(sym)) { first[r.lhs].add(sym); allEps = false; break; }
+        for (var x of first[sym]) if (x !== 'ε') first[r.lhs].add(x);
+        if (!first[sym].has('ε')) { allEps = false; break; }
+      }
+      if (allEps) first[r.lhs].add('ε');
+      if (first[r.lhs].size !== prev) changed = true;
+    }
+  }
+  return first;
+}
+
+function firstOfSeq(seq, first, nonterminals) {
+  var result = new Set();
+  if (!seq.length) { result.add('ε'); return result; }
+  for (var sym of seq) {
+    if (sym === 'ε') { result.add('ε'); break; }
+    if (!nonterminals.has(sym)) { result.add(sym); return result; }
+    for (var x of first[sym]) if (x !== 'ε') result.add(x);
+    if (!first[sym].has('ε')) return result;
+  }
+  result.add('ε');
+  return result;
+}
+
+function computeFollow(grammar, first) {
+  var { rules, startSymbol, nonterminals } = grammar;
+  var follow = {};
+  for (var nt of nonterminals) follow[nt] = new Set();
+  follow[startSymbol].add('$');
+  var changed = true;
+  while (changed) {
+    changed = false;
+    for (var r of rules) {
+      for (var i = 0; i < r.rhs.length; i++) {
+        var B = r.rhs[i];
+        if (!nonterminals.has(B)) continue;
+        var prev = follow[B].size;
+        var beta = r.rhs.slice(i + 1);
+        var fb = firstOfSeq(beta, first, nonterminals);
+        for (var x of fb) if (x !== 'ε') follow[B].add(x);
+        if (fb.has('ε') || !beta.length) for (var y of follow[r.lhs]) follow[B].add(y);
+        if (follow[B].size !== prev) changed = true;
+      }
+    }
+  }
+  return follow;
+}
+
+function buildTable(grammar, first, follow) {
+  var { rules, nonterminals } = grammar;
+  var table = {};
+  var conflicts = [];
+  for (var nt of nonterminals) table[nt] = {};
+  for (var r of rules) {
+    var fa = firstOfSeq(r.rhs, first, nonterminals);
+    for (var a of fa) {
+      if (a !== 'ε') {
+        if (table[r.lhs][a]) conflicts.push({ nt: r.lhs, term: a });
+        else table[r.lhs][a] = r;
+      }
+    }
+    if (fa.has('ε')) {
+      for (var b of follow[r.lhs]) {
+        if (table[r.lhs][b]) conflicts.push({ nt: r.lhs, term: b });
+        else table[r.lhs][b] = r;
+      }
+    }
+  }
+  return { table, conflicts };
+}
+
+function buildParser() {
+  var text = document.getElementById('grammarTA').value.trim();
+  if (!text) return;
+  try {
+    var grammar = parseGrammarText(text);
+    if (!grammar.rules.length) return;
+    var first = computeFirst(grammar);
+    var follow = computeFollow(grammar, first);
+    var { table, conflicts } = buildTable(grammar, first, follow);
+    G = { grammar, first, follow, table, conflicts };
+    renderFF(grammar, first, follow);
+    renderTable(grammar, table, conflicts);
+    document.getElementById('traceOutput').innerHTML =
+      '<div class="notice-box notice-ok">✓ Grammar loaded — enter an input string below and click Parse.</div>';
+  } catch(e) {
+    document.getElementById('tabFF').innerHTML = '<div class="notice-box notice-err">✕ Error: ' + e.message + '</div>';
+  }
+}
+
+function tagsFor(arr) {
+  return arr.map(t => t === 'ε' ? '<span class="tag-eps">ε</span>' : '<span class="tag-t">' + t + '</span>').join(' ');
+}
+
+function renderFF(grammar, first, follow) {
+  var h = '<div class="ff-row"><div class="ff-head">Non-terminal</div><div class="ff-head">FIRST</div><div class="ff-head">FOLLOW</div></div>';
+  for (var nt of grammar.nonterminals) {
+    h += '<div class="ff-row">';
+    h += '<div><span class="tag-nt">' + nt + '</span></div>';
+    h += '<div>' + tagsFor([...first[nt]]) + '</div>';
+    h += '<div>' + tagsFor([...follow[nt]]) + '</div>';
+    h += '</div>';
+  }
+  document.getElementById('tabFF').innerHTML = h;
+}
+
+function renderTable(grammar, table, conflicts) {
+  var terms = [...grammar.terminals, '$'];
+  var cset = new Set(conflicts.map(c => c.nt + '|' + c.term));
+  var h = '<table class="ptable"><tr><th>NT \\ T</th>';
+  terms.forEach(t => h += '<th>' + t + '</th>');
+  h += '</tr>';
+  for (var nt of grammar.nonterminals) {
+    h += '<tr><td>' + nt + '</td>';
+    terms.forEach(t => {
+      var key = nt + '|' + t;
+      var entry = table[nt][t];
+      if (cset.has(key)) h += '<td class="conflict">conflict</td>';
+      else if (entry) h += '<td class="entry">' + entry.lhs + '→' + entry.rhs.join(' ') + '</td>';
+      else h += '<td style="color:var(--text3)">—</td>';
+    });
+    h += '</tr>';
+  }
+  h += '</table>';
+  var status = conflicts.length
+    ? '<div class="notice-box notice-err" style="margin-top:10px;">✕ ' + conflicts.length + ' conflict(s) detected — not LL(1).</div>'
+    : '<div class="notice-box notice-ok" style="margin-top:10px;">✓ Grammar is LL(1). No conflicts.</div>';
+  document.getElementById('tabTable').innerHTML = h + status;
+}
+
+function parseInput() {
+  if (!G) return;
+  var inp = document.getElementById('inputStr').value.trim();
+  if (!inp) return;
+  var tokens = inp.split(/\s+/).concat(['$']);
+  var stack = ['$', G.grammar.startSymbol];
+  var steps = [];
+  var pos = 0;
+  var limit = 150;
+  var ok = false;
+  while (stack.length && limit-- > 0) {
+    var top = stack[stack.length - 1];
+    var cur = tokens[pos];
+    var stk = [...stack].reverse().join(' ');
+    var rem = tokens.slice(pos).join(' ');
+    if (top === '$' && cur === '$') {
+      steps.push({ stk, rem, act: 'ACCEPT', cls: 'ok-row' }); ok = true; break;
+    }
+    if (!G.grammar.nonterminals.has(top)) {
+      if (top === cur) {
+        steps.push({ stk, rem, act: 'match ' + top, cls: '' });
+        stack.pop(); pos++;
+      } else {
+        steps.push({ stk, rem, act: 'ERROR: expected ' + top + ', got ' + cur, cls: 'err-row' }); break;
+      }
+    } else {
+      var rule = G.table[top] && G.table[top][cur];
+      if (!rule) {
+        steps.push({ stk, rem, act: 'ERROR: no M[' + top + ',' + cur + ']', cls: 'err-row' }); break;
+      }
+      steps.push({ stk, rem, act: top + ' → ' + rule.rhs.join(' '), cls: '' });
+      stack.pop();
+      if (!(rule.rhs.length === 1 && rule.rhs[0] === 'ε'))
+        for (var i = rule.rhs.length - 1; i >= 0; i--) stack.push(rule.rhs[i]);
+    }
+  }
+  var h = '<div class="trace-head"><div>Stack</div><div>Input</div><div>Action</div></div>';
+  steps.forEach(s => {
+    h += '<div class="trace-row ' + s.cls + '">';
+    h += '<div class="trace-col" title="' + s.stk + '">' + s.stk + '</div>';
+    h += '<div class="trace-col">' + s.rem + '</div>';
+    h += '<div class="trace-col">' + s.act + '</div></div>';
+  });
+  document.getElementById('traceOutput').innerHTML = h;
+  if (ok)
+    document.getElementById('traceOutput').innerHTML += '<div class="notice-box notice-ok" style="margin-top:8px;">✓ Input accepted successfully.</div>';
+}
+
+// Boot
+document.getElementById('grammarTA').value = examples.expr;
+buildParser();
+</script>
+</body>
+</html>
